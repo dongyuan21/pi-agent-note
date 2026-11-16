@@ -11,30 +11,30 @@
 ```
 repo/
 ├── packages/
-│   ├── ai/              ← @earendil-works/pi-ai
-│   ├── agent/           ← @earendil-works/pi-agent-core
-│   ├── coding-agent/    ← @earendil-works/pi-coding-agent
-│   ├── orchestrator/    ← @earendil-works/pi-orchestrator（实验性，多 Agent 编排）
-│   └── tui/             ← @earendil-works/pi-tui
+│   ├── ai/              ← @earendil-works/pi-ai          【主线】
+│   ├── agent/           ← @earendil-works/pi-agent-core   【主线】
+│   ├── coding-agent/    ← @earendil-works/pi-coding-agent 【主线】
+│   ├── tui/             ← @earendil-works/pi-tui          【正交 UI】
+│   ├── mcp/             ← @earendil-works/pi-mcp          （同仓；本教程第 10 章后再提）
+│   ├── durable/         ← …                               （同仓；不展开）
+│   └── …                ← codemode / schema / telemetry / …
 ├── package.json         ← 根配置，npm workspaces
 └── tsconfig.json
 ```
 
-五个包，整整齐齐排成一排。
+v1.5.2 的 monorepo 里包比早期多——上面只把**学习主线**画清楚，其余用省略号收住。
 
-> 注 1：历史上还存在过 `pi-web-ui`（浏览器端 Lit 组件库），但官方已于 2026-05-20 在 commit `b141e1fa` 中移除该 workspace，当前仓库不再包含此包。
->
-> 注 2：`pi-orchestrator` 为 v0.80.x 新增的实验性编排包，依赖 `pi-coding-agent`，负责多 Agent 协调、RPC 进程通信与 Supervisor 监控。它属于**外围编排层**，不在"核心三件套"的学习主线里，本模块末尾单独说明。
+> 注：历史上还存在过 `pi-web-ui`（浏览器端 Lit 组件库），官方已于 2026-05-20 在 commit `b141e1fa` 中移除；早期出现过的 `pi-orchestrator` 也不在当前稳定版主线里。**本教程盯四个包**：`pi-ai` / `pi-agent-core` / `pi-coding-agent` / `pi-tui`。
 
 如果你做过 Node.js 项目，大概率用过 monorepo（把多个包放在一个仓库里管理）。Pi 用的就是标准的 npm workspaces 方案——根目录的 `package.json` 里声明了 `"workspaces": ["packages/*"]`，npm 会自动把 `packages/` 下的每个子目录当作一个独立的包来管理。
 
-但这不是重点。重点是：**为什么是五个包（其中四个构成核心三件套的延伸，一个是外围编排层）？它们之间的关系是什么？能不能合并？**
+但这不是重点。重点是：**为什么学习主线是这几个包？它们之间的关系是什么？能不能合并？**
 
 要回答这个问题，我们需要先搞清楚每个包到底在干什么。
 
 ---
 
-## 2. 五个包，各管各的
+## 2. 四个包，各管各的
 
 先不要管依赖关系，我们从每个包自己的视角看它在做什么。
 
@@ -56,16 +56,12 @@ repo/
 
 ```python
 # ============================================================
-# 【Python 改写】packages/ai/src/index.ts 的对外导出（v0.80.x 节选）
+# 【Python 改写】packages/ai/src/index.ts 的对外导出（v1.5.2 节选）
 # 原文 TS:
-#   // 顶部注释明确写：Core only, side-effect free: no generated catalogs,
-#   // no provider factories, no api-registry, no OAuth implementations, no compat.
-#   // 全局 API 注册表、stream/complete 函数等已迁至 ./compat.ts
-#   export type { Static, TSchema } from "typebox";
-#   export { Type } from "typebox";
+#   // Core only… 旧的全局 stream/complete、getModel 在 @earendil-works/pi-ai/compat
 #   export * from "./api/lazy.ts";
 #   export * from "./auth/context.ts";
-#   ...
+#   export * from "./models.ts";
 #   export * from "./types.ts";
 #   export * from "./utils/event-stream.ts";
 # ============================================================
@@ -99,26 +95,21 @@ from pi_ai.utils.event_stream import EventStream
 - 怎么维护对话状态（`AgentState`）
 - 怎么跑一个"调用 LLM → 执行工具 → 再调用 LLM"的循环（`agentLoop`）
 - 怎么在循环过程中发出事件，让外部知道发生了什么（`AgentEvent`）
-- 怎么管理会话历史、做上下文压缩（`Session`、`compact`）
 
-看它的 `index.ts` 导出：
+看它的 `index.ts` 导出（v1.5.2 很瘦——循环与类型在这里；**会话树 / 压缩落在 coding-agent**，后文第 9～10 章再讲）：
 
 ```python
 # ============================================================
-# 【Python 改写】packages/agent/src/index.ts 的对外导出（节选）
+# 【Python 改写】packages/agent/src/index.ts 的对外导出（v1.5.2 节选）
 # 原文 TS:
-#   export * from "./agent.js"               // Agent 类
-#   export * from "./agent-loop.js"          // 循环函数
-#   export * from "./harness/session/..."    // 会话管理
-#   export * from "./harness/compaction/..." // 上下文压缩
-#   export * from "./types.js"               // 类型定义
+#   export * from "./agent.ts"
+#   export * from "./agent-loop.ts"
+#   export * from "./types.ts"
 # ============================================================
 
 # 概念对照：Python 用 __init__.py 显式 re-export 来模拟 TS 的 export *
 from pi_agent_core.agent import Agent
 from pi_agent_core.agent_loop import agent_loop, run_agent_loop
-from pi_agent_core.harness.session import Session          # 会话管理
-from pi_agent_core.harness.compaction import compact       # 上下文压缩
 from pi_agent_core.types import (
     AgentMessage, AgentTool, AgentEvent, AgentState,
 )
@@ -177,30 +168,19 @@ if __name__ == "__main__":
 
 ### 2.4 pi-tui：管"显示"
 
-最后一个包是 UI 层：
+主线里的 UI 包：
 
 - **pi-tui**：终端 UI 库，负责在终端里渲染 Markdown、代码高亮、差分显示。它的依赖里**没有任何 AI 相关的包**——运行时仅 `marked`（Markdown 渲染）+ `get-east-asian-width`（东亚字符宽度计算）；`chalk`、`@xterm/headless` 在 devDependencies，不打包进运行时
 
 这个包和"Agent 怎么工作"没有直接关系，它只是负责把 Agent 的工作过程展示给用户看。后面的学习中我们不会深入这一层。
 
-### 2.5 pi-orchestrator：管"多 Agent 编排"（实验性）
+### 2.5 同仓其它包（本教程先不展开）
 
-`@earendil-works/pi-orchestrator`（源码在 `packages/orchestrator/`）是 v0.80.x 新增的**实验性**包，解决的问题是：**怎么让多个 coding-agent 协同工作？**
-
-它的核心由几个文件组成：
-
-- `supervisor.ts` —— 监控者，管理子 Agent 的生命周期
-- `rpc-process.ts` —— 基于 RPC 的进程间通信
-- `radius.ts` —— 编排范围/边界控制
-- `serve.ts` / `storage.ts` —— 服务暴露与状态持久化
-
-注意它的定位：它**依赖 `pi-coding-agent`**，站在 coding-agent 之上，本身不实现任何 Agent 内核逻辑（循环、状态、压缩仍由 agent-core 提供）。它只是把若干个 coding-agent 实例"编"起来，让它们可以分工、通信、被监督。
-
-> ⚠️ 这是实验性能力，API 和文件结构都可能调整。学习主线只看核心三件套（ai / agent-core / coding-agent）即可，orchestrator 留到进阶阶段再接触。
+`ls packages/` 时你还会看到 `mcp`、`durable`、`codemode`、`schema`、`telemetry` 等。它们服务产品能力或支撑设施，**不是前 10 章的阅读主线**。其中 MCP 只在第 10 章末提一句入口；其余需要时再查官方文档即可。
 
 ---
 
-## 3. 看完五个包，你大概有了直觉
+## 3. 看完主线四包，你大概有了直觉
 
 读完上面那一段，你脑子里可能已经有了一个画面：
 
@@ -235,11 +215,13 @@ if __name__ == "__main__":
 如果你的分层理解是"上层只能依赖相邻的下层"，那打开 `packages/coding-agent/package.json` 的 `dependencies` 字段，你会看到一个意料之外的细节：
 
 ```json
-// packages/coding-agent/package.json
+// packages/coding-agent/package.json（v1.5.2，Pi 相关依赖）
 "dependencies": {
-    "@earendil-works/pi-agent-core": "^0.80.2",   // ← 依赖中间层，合理
-    "@earendil-works/pi-ai": "^0.80.2",            // ← 也直接依赖底层？
-    "@earendil-works/pi-tui": "^0.80.2",
+    "@earendil-works/pi-agent-core": "1.5.2",   // ← 依赖中间层，合理
+    "@earendil-works/pi-ai": "1.5.2",            // ← 也直接依赖底层？
+    "@earendil-works/pi-tui": "1.5.2",
+    "@earendil-works/pi-mcp": "1.5.2",           // ← 产品能力；本教程后文再提
+    "@earendil-works/pi-codemode": "1.5.2"
     // ... 其他依赖
 }
 ```
@@ -289,11 +271,11 @@ pi-agent-core 的类型定义里，大量基础类型都是从 pi-ai 导入的�
 
 我们来验证一下。看看每个包的 `dependencies` 里有没有反向依赖：
 
-| 包 | 依赖了谁 | 有没有反向依赖？ |
+| 包 | 依赖了谁（Pi 相关） | 有没有反向依赖？ |
 |---|---------|---------------|
-| pi-ai | @anthropic-ai/sdk, openai, @google/genai 等 SDK | 没有，它不依赖任何 pi-xxx 包 |
-| pi-agent-core | @earendil-works/pi-ai, typebox, yaml | 只向上依赖 pi-ai，不依赖 coding-agent |
-| pi-coding-agent | @earendil-works/pi-ai, @earendil-works/pi-agent-core, @earendil-works/pi-tui | 只向上依赖，不反向依赖 |
+| pi-ai | 各家 LLM SDK 等（不依赖其它 pi-*） | 没有，它不依赖任何 pi-xxx 包 |
+| pi-agent-core | pi-ai、pi-schema 等 | 只向上依赖，不依赖 coding-agent |
+| pi-coding-agent | pi-ai、pi-agent-core、pi-tui（另有 mcp、codemode） | 只向上依赖，不反向依赖 |
 
 用一张图表示：
 
@@ -305,18 +287,15 @@ pi-ai（底层）
   │         ↑
   │         │
   └─── pi-coding-agent（顶层）
-            ↑
-            │
-       pi-orchestrator（实验性外围编排层，可选）
 ```
 
-所有箭头都朝上。**底层永远不知道上层的存在**——pi-ai 的代码里没有任何一个 import 指向 pi-agent-core 或 pi-coding-agent；orchestrator 也不会反向渗透到 coding-agent 内部。这就是分层的真正规则：**不是限制引用层级，而是控制依赖方向必须单向向上。**
+所有箭头都朝上。**底层永远不知道上层的存在**——pi-ai 的代码里没有任何一个 import 指向 pi-agent-core 或 pi-coding-agent。这就是分层的真正规则：**不是限制引用层级，而是控制依赖方向必须单向向上。**
 
 有人可能会问：那 pi-tui 呢，它也是底层的吗？
 
 pi-tui 的运行时依赖只有 `marked`（Markdown 渲染）和 `get-east-asian-width`（东亚字符宽度），**没有任何 pi-xxx 包**。它不依赖 pi-ai，也不依赖 pi-agent-core。它就是一个独立的终端渲染工具。pi-coding-agent 依赖 pi-tui，把它当工具用，不存在循环依赖。
 
-> 代码来源：各包的 `package.json` 的 `dependencies` 字段。`packages/ai/src/types.ts` 定义了 `KnownApi`（9 种 API 类型）和 `KnownProvider`（30+ 提供商），这些是整个系统的类型基础。
+> 代码来源：各包的 `package.json` 的 `dependencies` 字段（对照 **v1.5.2**）。`packages/ai/src/types.ts` 定义了 `KnownApi` 与 `KnownProvider`（枚举会随版本增加），这些是整个系统的类型基础。
 
 ---
 

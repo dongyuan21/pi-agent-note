@@ -45,22 +45,22 @@ import Diagram from '../../components/Diagram.astro';
 
 - **"编码 Agent"** — 它能读懂你的代码库，写代码、改代码、跑命令，像一个坐在你旁边的结对编程伙伴
 - **"终端外壳"** — 它住在终端里，没有 GUI，没有 IDE 插件，输出写进终端回滚缓冲区。这决定了它的一切后续设计选择
-- **"极简"** — 核心四个内置工具（read / write / edit / bash）、约 90 词（英文 word，非 token）的静态系统提示词模板（运行时拼接 tools/skills/contextFiles 后通常 200-400 词）、约 12000 行 TUI 代码（核心 `tui.ts` 单文件约 1700 行）。它刻意**不**构建 MCP、子 Agent、计划模式、权限弹窗、后台 bash
+- **"极简"** — 核心四个内置工具（read / write / edit / bash）、约 90 词（英文 word，非 token）的静态系统提示词模板（运行时拼接 tools/skills/contextFiles 后通常 200-400 词）、约 12000 行 TUI 代码（核心 `tui.ts` 单文件约 1700 行）。它刻意**不**把子 Agent、计划模式、权限弹窗、后台 bash 焊进核心——缺的能力用扩展 / 包按需补
 - **"可扩展"** — 极简核心之上的缺失功能，通过 TypeScript 扩展、技能、Pi Package 来补充
 
 ### 关键数字
 
 | 指标 | 数值 | 含义 |
 |------|------|------|
-| GitHub Stars | 64,000+ | 十个月的增长，社区验证了需求 |
-| 内置工具数 | 4 核心 + 3 辅助 | 核心：read / write / edit / bash；辅助：grep / find / ls |
+| GitHub Stars | 120,000+ | 社区验证了需求（数量会变，以仓库页为准） |
+| 内置工具数 | 4 核心 + 辅助 | 核心：read / write / edit / bash；辅助含 grep / find / ls 等（Windows 另有 powershell） |
 | 系统提示词 | 静态模板 ~90 词（英文 word，运行时 200-400 词） | 对比 Claude Code 的数万字 |
-| TUI 代码量 | ~12000 行 | 核心 `tui.ts` 单文件约 1700 行；Mario 的游戏引擎背景带来的"克制" |
-| 支持供应商 | 30+ 家 | 源码 `KnownProvider` 枚举实际 35 个（含区域变体），独立品牌约 27 个；Anthropic、OpenAI、Google、Groq、Ollama 等 |
-| 核心包数量 | 4 个 | pi-ai / pi-agent-core / pi-tui / pi-coding-agent |
+| TUI 代码量 | ~12000 行量级 | 核心 `tui.ts` 单文件约 1700 行；Mario 的游戏引擎背景带来的"克制" |
+| 支持供应商 | 40+ 个 KnownProvider | `KnownProvider` 含区域变体；独立品牌约 30 个量级；Anthropic、OpenAI、Google、Groq、DeepSeek 等 |
+| 学习主线包 | 4 个 | pi-ai / pi-agent-core / pi-tui / pi-coding-agent（同仓还有 mcp、durable 等，本教程后文再点） |
 | 运行模式 | 4 种 | 交互 / print-JSON / RPC / SDK |
 
-> **关于数字的说明**：Pi 官网早期营销材料常说"4 个内置工具"、"15+ 家供应商"、"约 600 行 TUI"——前两者分别指**核心 4 个工具**（不含 grep/find/ls 辅助工具）和早期版本列举的知名厂商；"600 行 TUI"是早期版本的数字，v0.80.2 实际已增长到约 12000 行。本表按 **v0.80.2 源码实际数字**呈现，避免读者对照源码时困惑。
+> **关于数字的说明**：Pi 官网早期营销材料常说"4 个内置工具"、"15+ 家供应商"、"约 600 行 TUI"——那是更早版本的口径。本表按 **v1.5.2** 对照整理；Stars / Provider 枚举会随发布变动，读到具体源码时以该 tag 为准。
 
 ### 四个核心包，各司其职
 
@@ -84,7 +84,7 @@ import Diagram from '../../components/Diagram.astro';
 
 **配图说明**：四个核心包的分层依赖图。coding-agent 在顶层（产品+SDK），agent-core 在中层（引擎），pi-ai 在底层（模型抽象），pi-tui 是平行的 UI 层不依赖任何 AI 包。底部展示四种运行模式。
 
-> 外围还有一个实验性的 `pi-orchestrator`（v0.80.x 新增），负责多 Agent 编排，不在核心学习主线内。
+> 同仓还有 `pi-mcp`、`pi-durable`、`pi-codemode` 等包。**本教程前 10 章只盯学习主线四包**；MCP 等放到第 10 章之后再提一句，避免抢核心篇幅。
 
 ---
 
@@ -100,7 +100,7 @@ import Diagram from '../../components/Diagram.astro';
 
 - 为什么系统提示词只有约 1,000 个 token？因为"该说什么"应该由你决定，不该被框架预判
 - 为什么只内置 4 个工具（read / write / edit / bash）？因为更多内置工具 = 更多不可改变的约束
-- 为什么没有 MCP / 计划模式 / 子 Agent / 待办？因为这些都是"整车上的功能"，Pi 把它们留给你——你想用什么模式，就用扩展去搭
+- 为什么没有把计划模式 / 子 Agent / 待办焊进核心？因为这些都是"整车上的功能"，Pi 把它们留给你——你想用什么模式，就用扩展去搭
 
 社区观察者 Pasquale 把这个分野说得最锋利：
 
@@ -112,7 +112,7 @@ import Diagram from '../../components/Diagram.astro';
 
 ### 3.2 五根定制杠杆：Pi 没有的功能，全都可以自己造
 
-§3.1 说过 Pi 没有 MCP、没有计划模式、没有子 Agent、没有 loop 模式、没有待办——你可能要问：那这些"商业 Agent 标配功能"我想要怎么办？
+§3.1 说过 Pi 核心里没有焊死计划模式、子 Agent、loop 模式、待办——你可能要问：那这些"商业 Agent 标配功能"我想要怎么办？
 
 答案就在 §3.1 那句"它不给你计划模式，它给你**构造计划模式所需的构建块**"。Pi 给你**五根杠杆**来把它塑形成你想要的形状——前四根用于自己用，第五根用于把成果分享出去。**这五根杠杆本身才是 Pi 真正的能力所在**：极简的核心 + 强大的杠杆，让你拿到的是"一个能长成任何形状的 Agent"，而不是"一个被作者决定了长成什么形状的 Agent"。
 
@@ -126,7 +126,7 @@ import Diagram from '../../components/Diagram.astro';
 
 > "那些你大概以为是默认行为的内置能力——**子 Agent、计划模式、权限门禁、沙箱、MCP 集成、自定义编辑器**——全都可以作为扩展实现，并在仓库里以示例形式提供。"
 
-把这句话翻成大白话：商业 Agent 把这些功能焊死在产品里，Pi 把它们拆下来变成可选模块。你想要 MCP？装一个 MCP 扩展就行。你想要子 Agent？派生一个新的 Pi 实例的扩展就有现成的。你想要 loop 模式（让 Agent 自己迭代到任务完成）？写一个扩展拦截 `turn_end` 事件再触发下一轮就行——扩展怎么写，实战上手篇第 6 章"事件监听"会带你入门。
+把这句话翻成大白话：商业 Agent 把这些功能焊死在产品里，Pi 把它们拆下来变成可选模块。你想要子 Agent？派生一个新的 Pi 实例的扩展就有现成的。你想要 loop 模式（让 Agent 自己迭代到任务完成）？写一个扩展拦截 `turn_end` 事件再触发下一轮就行——扩展怎么写，实战上手篇第 6 章"事件监听"会带你入门。至于 MCP：仓库里已有独立客户端包，按需连接即可——**本教程把它留到第 10 章之后再提**，这里不抢篇幅。
 
 更狠的是——**如果官方扩展没满足你，你可以自己写一个完全按你需求的**。Mario 描述过一个例子：有人五分钟写了一套 read、write、edit、bash，通过 SSH 操作远程机器——彻底替换掉了内置工具。如果你想给 Pi 加一个权限审批弹窗（毕竟默认 YOLO），约 50 行扩展代码就够了。如果你想 fork 出一套完全不同的 UI（比如把 Agent 跑在浏览器里、用 React 重画界面），也办得到。**Pi 的能力，随你愿意定制它的意愿而线性增长**。
 
@@ -162,7 +162,7 @@ pi install git:github.com/user/repo
 
 讲完了"Pi 是积木"，回到最实际的问题：那 Pi 这盒积木**按默认配置拼出来**之后，作为一个日常编码工具，体验怎么样？答案：好得令人吃惊。
 
-Pi 在 TerminalBench 基准测试（约 82 项计算机使用与编程任务的 Agent 评估）中排名第二，使用 Claude Opus 4.5 时仅次于 Terminus——尽管它**没有 MCP 支持、没有子 Agent、没有计划模式、没有后台 bash、没有内置待办**。这一结果表明一件事：极简的取向没牺牲能力，那些"整车上的功能"对一个能干的 Agent 来说并不是必需品。
+Pi 在 TerminalBench 基准测试（约 82 项计算机使用与编程任务的 Agent 评估）中曾排名第二（使用 Claude Opus 4.5，仅次于 Terminus）——尽管核心**没有焊死子 Agent、计划模式、后台 bash、内置待办**。这一类结果表明：极简取向未必牺牲能力，那些"整车上的功能"对一个能干的 Agent 来说并不是必需品。（基准排名会过时，把它当故事而非成绩单。）
 
 下面是默认配置下你立刻能享受到的几个红利：
 
@@ -170,7 +170,7 @@ Pi 在 TerminalBench 基准测试（约 82 项计算机使用与编程任务的 
 
 **透明到骨头里**。你能看到模型收到的每一条消息、每一次工具调用的完整输入输出、跨会话的完整成本追踪、会话的 HTML/JSON 导出。用过其他编码 Agent 的人大概都经历过：Agent 做了个奇怪决定，你想知道它为什么这样做，但你看不到它"看到"了什么。在 Pi 里没有这种黑箱。
 
-**模型自由（30+ 供应商）**。Pi 支持 35 个 KnownProvider（Anthropic、OpenAI、Google、Azure、Bedrock、Mistral、Groq、Cerebras、xAI、Hugging Face、Kimi、MiniMax、OpenRouter、Ollama、DeepSeek、智谱、小米、Together、Fireworks 等等，去重后约 27 个独立品牌）。更重要的是**会话中途切换模型**——用 `/model` 或 `Ctrl+L`。比如用 Claude 做复杂推理、切到 MiniMax 做简单文本处理省钱。`pi-ai` 在底层处理了跨供应商的上下文交接（思考轨迹转换、签名 blob 回放等），虽然本质有损、但比"切换等于重新开始"强多了。
+**模型自由（40+ KnownProvider）**。Pi 的 `KnownProvider` 覆盖 Anthropic、OpenAI、Google、Azure、Bedrock、Mistral、Groq、Cerebras、xAI、Hugging Face、Kimi、MiniMax、OpenRouter、DeepSeek、智谱、小米、Together、Fireworks 等（含区域变体，枚举以源码为准）。更重要的是**会话中途切换模型**——用 `/model` 或 `Ctrl+L`。比如用 Claude 做复杂推理、切到 MiniMax 做简单文本处理省钱。`pi-ai` 在底层处理了跨供应商的上下文交接（思考轨迹转换、签名 blob 回放等），虽然本质有损、但比"切换等于重新开始"强多了。
 
 **树状会话：走错路就分叉**。Pi 把会话存成**树结构**（DAG，有向无环图），而不是线性日志。`/tree` 跳到任意历史消息、从那里分叉出新分支继续探索。所有分支活在同一个文件里。调试时尤其有用——你可以在同一个起点尝试三种不同的修复方案，不必担心"回不去了"。
 
@@ -249,7 +249,7 @@ models.json 还支持两种进阶用法（本教程不展开）：用 `modelOver
 
 ### 4.1 为什么是 Pi？——因为它足够小
 
-很多 Agent 框架动辄几万行代码，光是搞清楚启动流程就要读几十个文件。Pi 的核心循环只有几百行，但它的设计质量一点都不"简陋"——它在 TerminalBench 基准测试中排名第二（使用 Claude Opus 4.5），仅次于 Terminus，尽管它缺少 MCP、子 Agent、计划模式等功能。
+很多 Agent 框架动辄几万行代码，光是搞清楚启动流程就要读几十个文件。Pi 的核心循环只有几百行，但它的设计质量一点都不"简陋"——核心刻意不焊子 Agent、计划模式等"整车功能"，却仍能把编码 Agent 跑得很能干。
 
 **这意味着你可以在有限的时间内真正"读完"一个高质量 Agent 的全部核心代码。** 这种事对 Claude Code 来说是不可能的，对 LangChain 也是不可能的。
 
@@ -270,7 +270,7 @@ models.json 还支持两种进阶用法（本教程不展开）：用 `modelOver
 | 第 9 章 | 上下文压缩 | 对话太长怎么办？ | 进阶 |
 | 第 10 章 | 会话管理 | 会话怎么存、怎么恢复、怎么分叉？ | 进阶 |
 
-> **内容范围**：源码学习篇共 10 章，已全部完结。扩展系统、测试模式等高阶主题不再单章展开——扩展的上手用法见[实战上手篇](/modules/pr01-env-setup)第 6 章"事件监听"，其余可查阅 [pi 官方仓库](https://github.com/earendil-works/pi) 的源码与文档。
+> **内容范围**：源码学习篇共 10 章，已全部完结。扩展系统、测试模式、MCP 等高阶主题不在前 10 章展开——扩展的上手用法见[实战上手篇](/modules/pr01-env-setup)第 6 章"事件监听"；MCP 在第 10 章末提一句入口，细节见 [pi 官方文档](https://docs.pi.dev/latest/mcp)。
 
 > **阅读建议**：前 6 章建议按顺序通读，它们是理解 Pi-Agent 运行机制的基础。第 7 章起可按需跳读，每章相对独立。
 
@@ -282,14 +282,15 @@ models.json 还支持两种进阶用法（本教程不展开）：用 `modelOver
 
 Pi 官网的 "What we didn't build" 章节是一份倒过来的宣言。竞争对手在罗列功能，Pi 在罗列舍弃。每一次舍弃背后，都有清晰的工程理由：
 
-| Pi 不做的 | 为什么不做 | 替代方案 |
+| Pi 不做的（核心里不焊死） | 为什么不做 | 替代方案 |
 |-----------|-----------|----------|
-| MCP 支持 | MCP 服务器（如 Playwright MCP）会在会话开始灌入 13,700+ token 的工具描述 | 带 README 的 CLI 工具，Agent 按需读取 |
 | 子 Agent | 增加复杂度，降低可观察性 | tmux 多实例，或专用扩展 |
 | 权限弹窗 | 导致"弹窗疲劳"，沦为安全表演 | 容器化隔离，或用扩展搭审批流程 |
 | 计划模式 | 计划写到 markdown 文件里更持久、可复用 | 写 plan.md 文件 |
 | 后台 bash | tmux 已经解决了这个问题 | 用 tmux |
 | 内置待办 | TODO.md 文件更灵活 | 用 markdown 文件或自建扩展 |
+
+> **关于 MCP**：早期材料常把 MCP 列进"不做"清单。到 **v1.5.2**，仓库已有 `@earendil-works/pi-mcp`，可按需连接服务器——哲学没变的是**默认不把大段工具描述灌进每个会话**。用法放到第 10 章之后点一下即可。
 
 这些取舍是理解 Pi 设计哲学的关键，也是学习 Agent 设计时最有价值的思考素材。
 
@@ -442,4 +443,4 @@ Pi 是一个"三位一体"的项目：
 
 > ### 版本说明
 >
-> 本文档系列基于 Pi **v0.80.2** 编写。代码分析以 [earendil-works/pi](https://github.com/earendil-works/pi) 仓库的实际源码为准（教程链接指向 main 分支，可能与 v0.80.2 有微小差异）。
+> 本文档系列对照 Pi **v1.5.2**（npm `@earendil-works/pi-coding-agent@1.5.2` / GitHub tag `v1.5.2`）。代码分析以 [earendil-works/pi](https://github.com/earendil-works/pi) 该 tag 的源码为准；若你检出 `main`，个别路径可能已继续演进。
